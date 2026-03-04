@@ -491,8 +491,6 @@ if uploaded_file is not None:
 
             if clean_notification:
                 st.warning(clean_notification)
-                if rows_removed > 0:
-                    st.snow()
 
             # Apply Auto Label Encoding for categorical data
             df_encoded, mappings = auto_label_encode(df_clean)
@@ -512,10 +510,6 @@ if uploaded_file is not None:
             st.session_state.feature_cols = feature_cols
             st.session_state.target_col = target_col
             st.session_state.weights = [0.5] * len(feature_cols)
-
-            # Success notification
-            st.balloons()
-            time.sleep(0.5)
 
             # Display processed data
             st.markdown("---")
