@@ -861,29 +861,20 @@ if uploaded_file is not None:
                 # Set 'n' as index to replace default integer index
                 results_df = results_df.set_index('n')
 
-                # Color-code error rows: highlight rows with error ≠ 0
-                def highlight_error(row):
-                    if abs(row['Err (ε)']) > 1e-6:
-                        return ['background-color: rgba(255, 100, 100, 0.15)'] * len(row)
-                    return [''] * len(row)
-
                 st.markdown("### 📋 Detailed Training Log (4 decimal places)")
                 
-                # Use standard list for subset to ensure compatibility with Streamlit's Arrow marshaller
+                # Format numeric columns to 4 decimal places
                 numeric_cols = results_df.select_dtypes(include=[np.number]).columns.tolist()
-                
-                # Epoch and n (index) should be integers, so we handle them separately if needed 
-                # but results_df.set_index('n') already made 'n' the index.
-                # We'll format only float-like columns.
                 if 'Epoch' in numeric_cols:
                     numeric_cols.remove('Epoch')
-
-                styled_df = results_df.style.apply(highlight_error, axis=1).format(
-                    "{:.4f}", subset=numeric_cols
-                )
+                
+                # Create a copy for display with formatted values
+                display_df = results_df.copy()
+                for col in numeric_cols:
+                    display_df[col] = display_df[col].round(4)
                 
                 st.dataframe(
-                    styled_df,
+                    display_df,
                     use_container_width=True
                 )
 
