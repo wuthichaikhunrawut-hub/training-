@@ -935,16 +935,19 @@ if uploaded_file is not None:
             </div>
             """, unsafe_allow_html=True)
 
-            # Input fields for manual prediction
-            pred_col1, pred_col2, pred_col3 = st.columns([1, 2, 1])
+            # Horizontal layout: Input fields on left, results on right
+            pred_col_left, pred_col_right = st.columns([1, 1])
 
-            with pred_col1:
+            # ============================================
+            # LEFT COLUMN: INPUT FIELDS & CALCULATE BUTTON
+            # ============================================
+            with pred_col_left:
                 st.markdown("### 📥 Input Values")
 
                 input_values = []
                 input_cols = st.columns(2)
 
-                for i, col in enumerate(feature_cols):
+                for i, col in enumerate(st.session_state.feature_cols):
                     with input_cols[i % 2]:
                         if col in st.session_state.mappings:
                             # Categorical feature: Use Selectbox
@@ -972,17 +975,16 @@ if uploaded_file is not None:
                             )
                         input_values.append(val)
 
-            with pred_col2:
-                # Prediction Button
-                st.markdown("<br>" * 3, unsafe_allow_html=True)
-                if st.button("🚀 CALCULATE PREDICTION", use_container_width=True):
+                # Calculate Button
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🚀 CALCULATE PREDICTION", use_container_width=True, key="calc_btn"):
                     st.session_state.calculation_done = True
 
+                # Perform prediction if button was clicked
                 if st.session_state.calculation_done:
-                    # Perform prediction
                     # Scale input values
                     input_scaled = []
-                    for i, col in enumerate(feature_cols):
+                    for i, col in enumerate(st.session_state.feature_cols):
                         orig_min = float(st.session_state.df_encoded[col].min())
                         orig_max = float(st.session_state.df_encoded[col].max())
                         if orig_max - orig_min != 0:
@@ -1002,53 +1004,97 @@ if uploaded_file is not None:
 
                     # Calculate prediction
                     prediction, net_input, raw_output = perceptron_predict(
-                        np.array(input_scaled),
-                        np.array(w_for_pred),
+                        np.array(input_scaled).flatten(),
+                        np.array(w_for_pred).flatten(),
                         activation_internal,
                         theta_for_pred,
                         gain
                     )
 
-                    st.session_state.last_prediction = prediction[0] if hasattr(prediction, '__len__') else prediction
-                    st.session_state.last_net_input = net_input if not hasattr(net_input, '__len__') else float(net_input)
-                    st.session_state.last_raw_output = raw_output if not hasattr(raw_output, '__len__') else float(raw_output)
+                    st.session_state.last_prediction = float(np.asarray(prediction).item())
+                    st.session_state.last_net_input = float(np.asarray(net_input).item())
+                    st.session_state.last_raw_output = float(np.asarray(raw_output).item())
                     st.session_state.last_input_scaled = input_scaled
 
-            with pred_col3:
+            # ============================================
+            # RIGHT COLUMN: PREDICTION RESULTS
+            # ============================================
+            with pred_col_right:
                 if st.session_state.calculation_done:
                     pred = st.session_state.last_prediction
                     raw = st.session_state.last_raw_output
                     net = st.session_state.last_net_input
 
-                    st.markdown("### 📤 Results")
-
-                    # Display prediction result
-                    result_color = "#00FF9F" if pred == 1 else "#FF6B6B"
+                    # Determine result styling based on prediction
+                    is_positive = int(pred) == 1
+                    result_color = "#00FF9F" if is_positive else "#FF6B6B"
+                    bg_color = "rgba(0, 255, 159, 0.1)" if is_positive else "rgba(255, 107, 107, 0.1)"
+                    result_label = "✅ ACCEPT" if is_positive else "❌ REJECT"
                     
                     # Try to get the original label name if it was encoded
                     map_info = st.session_state.mappings.get(st.session_state.target_col, {})
                     label_name = map_info.get(int(pred), f"CLASS {int(pred)}")
-                    result_text = f"{label_name}"
 
+                    # High-contrast result box
                     st.markdown(f"""
-                    <div class="cyber-box" style="text-align: center; border-color: {result_color};">
-                        <h2 style="color: {result_color}; font-size: 3rem; margin: 0;">
-                            {result_text}
+                    <div style="
+                        background-color: {bg_color};
+                        border: 3px solid {result_color};
+                        border-radius: 15px;
+                        padding: 30px;
+                        text-align: center;
+                        box-shadow: 0 0 30px {result_color}30;
+                    ">
+                        <h1 style="
+                            color: {result_color}; 
+                            font-size: 2.5rem; 
+                            margin: 0 0 15px 0;
+                            font-weight: 900;
+                            text-shadow: 0 0 20px {result_color}80;
+                        ">
+                            {result_label}
+                        </h1>
+                        <h2 style="
+                            color: #E0E0E0; 
+                            font-size: 1.8rem; 
+                            margin: 0 0 20px 0;
+                        ">
+                            {label_name}
                         </h2>
-                        <p style="color: #E0E0E0;">
-                            Net Input (z): <span style="color: #00F2FF;">{net:.4f}</span><br>
-                            Raw Output: <span style="color: #BC13FE;">{raw:.4f}</span>
-                        </p>
+                        <hr style="border: 1px solid {result_color}50; margin: 20px 0;">
+                        <div style="color: #E0E0E0; font-size: 1rem;">
+                            <p style="margin: 8px 0;">
+                                <strong>Net Input (z):</strong> <span style="color: #00F2FF; font-size: 1.2rem;">{net:.4f}</span>
+                            </p>
+                            <p style="margin: 8px 0;">
+                                <strong>Raw Output:</strong> <span style="color: #BC13FE; font-size: 1.2rem;">{raw:.4f}</span>
+                            </p>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Progress bar for confidence
+                    # Confidence indicator
                     st.markdown("### 📊 Confidence Level")
                     confidence = abs(raw) if activation_internal == 'sigmoid' else (1.0 if net >= 0 else 0.0)
                     progress_val = min(max(float(confidence), 0), 1)
+                    st.progress(progress_val, text=f"{progress_val*100:.1f}%")
 
-                    st.progress(progress_val)
-                    st.caption(f"Signal Strength: {progress_val*100:.1f}%")
+                else:
+                    # Placeholder when no calculation has been done yet
+                    st.markdown("""
+                    <div style="
+                        background-color: rgba(100, 100, 150, 0.1);
+                        border: 2px dashed #666;
+                        border-radius: 15px;
+                        padding: 40px 20px;
+                        text-align: center;
+                    ">
+                        <p style="color: #999; font-size: 1.1rem; margin: 0;">
+                            👈 Enter values on the left and click <br>
+                            <strong>CALCULATE PREDICTION</strong> to see results
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 else:
     # Welcome Screen (when no file uploaded)
