@@ -868,13 +868,23 @@ if uploaded_file is not None:
                     return [''] * len(row)
 
                 st.markdown("### 📋 Detailed Training Log (4 decimal places)")
+                
+                # Use standard list for subset to ensure compatibility with Streamlit's Arrow marshaller
+                numeric_cols = results_df.select_dtypes(include=[np.number]).columns.tolist()
+                
+                # Epoch and n (index) should be integers, so we handle them separately if needed 
+                # but results_df.set_index('n') already made 'n' the index.
+                # We'll format only float-like columns.
+                if 'Epoch' in numeric_cols:
+                    numeric_cols.remove('Epoch')
+
                 styled_df = results_df.style.apply(highlight_error, axis=1).format(
-                    "{:.4f}", subset=results_df.select_dtypes(include=[np.number]).columns
+                    "{:.4f}", subset=numeric_cols
                 )
+                
                 st.dataframe(
                     styled_df,
-                    use_container_width=True,
-                    height=520
+                    use_container_width=True
                 )
 
                 # Summary metrics
